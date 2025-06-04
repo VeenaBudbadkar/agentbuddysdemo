@@ -11,7 +11,7 @@ class _BirthdayGreetingScreenState extends State<BirthdayGreetingScreen> {
   List<Client> birthdayClients = [
     Client(name: 'Snehalata Bhosale', dob: '01 Jun', age: 35, category: 'VIP'),
     Client(name: 'Amit Sharma', dob: '01 Jun', age: 40, category: 'HNI'),
-    Client(name: 'Veena Kulkarni', dob: '01 Jun', age: 29, category: 'Family')
+    Client(name: 'Veena Kulkarni', dob: '01 Jun', age: 29, category: 'Family'),
   ];
 
   List<bool> selectedClients = [];
@@ -19,8 +19,13 @@ class _BirthdayGreetingScreenState extends State<BirthdayGreetingScreen> {
 
   @override
   void initState() {
-    selectedClients = List.filled(birthdayClients.length, false);
     super.initState();
+    selectedClients = List.filled(birthdayClients.length, false);
+  }
+
+  void restrictFeatureIfNoSubscription(BuildContext context, VoidCallback action) {
+    // TODO: Replace with actual subscription validation
+    action();
   }
 
   void sendManually() {
@@ -95,44 +100,48 @@ class _BirthdayGreetingScreenState extends State<BirthdayGreetingScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text("🎂 Today's Birthdays")),
       body: Column(
-      children: [
-        Expanded(
-        child: ListView.builder(
-        itemCount: birthdayClients.length,
-        itemBuilder: (context, index) {
-          final client = birthdayClients[index];
-          return CheckboxListTile(
-            value: selectedClients[index],
-            onChanged: (val) => setState(() => selectedClients[index] = val!),
-            title: Text(client.name),
-            subtitle: Text('${client.dob} • Age ${client.age} • ${client.category}'),
-          );
-        },
-      ),
-      ),
-      const Divider(),
-      buildTemplatePicker(),
-      Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            ElevatedButton.icon(
-              onPressed: sendManually,
-              icon: const Icon(Icons.send),
-              label: const Text('Send Selected Manually (Free)'),
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: birthdayClients.length,
+              itemBuilder: (context, index) {
+                final client = birthdayClients[index];
+                return CheckboxListTile(
+                  value: selectedClients[index],
+                  onChanged: (val) => setState(() => selectedClients[index] = val!),
+                  title: Text(client.name),
+                  subtitle: Text('${client.dob} • Age ${client.age} • ${client.category}'),
+                );
+              },
             ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: sendAutomatically,
-              icon: const Icon(Icons.flash_on),
-              label: const Text('Send All Automatically – 50 Credits'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+          ),
+          const Divider(),
+          buildTemplatePicker(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: sendManually,
+                  icon: const Icon(Icons.send),
+                  label: const Text('Send Selected Manually (Free)'),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    restrictFeatureIfNoSubscription(context, () {
+                      sendAutomatically();
+                    });
+                  },
+                  icon: const Icon(Icons.bolt),
+                  label: const Text('Auto Send (50 credits)'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                ),
+              ],
             ),
-          ],
-        ),
-      )
-      ],
-    ),
+          )
+        ],
+      ),
     );
   }
 }

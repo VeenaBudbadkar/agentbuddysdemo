@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:your_app/utils/subscription_guard.dart';
 
 class GreetingsAutomation extends StatefulWidget {
   const GreetingsAutomation({super.key});
@@ -181,6 +182,38 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
         const SnackBar(content: Text('✅ Greetings sent and credits deducted!')),
       );
     }
+  }
+
+
+  void handleAutoSend(BuildContext context) async {
+    bool isActive = await checkSubscriptionStatus();
+
+    if (!isActive) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Subscription Required"),
+          content: const Text("To use automatic greetings and marketing tools, please subscribe."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/subscription');
+              },
+              child: const Text("View Plans"),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // ✅ PROCEED WITH AUTOMATION IF SUBSCRIBED
+    runAutoSendFunction(); // Replace with your real function
   }
 
   @override

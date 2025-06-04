@@ -9,6 +9,12 @@ import 'screens/greetings/birthday_greeting_screen.dart';
 import 'screens/greetings/anniversary_greeting_screen.dart';
 import 'screens/calendar/calendar_view_screen.dart'; // Placeholder for future
 import 'screens/greetings/template_slider_page.dart'; // 👈 add this line
+import 'package:agentbuddys/screens/voice_assistant_screen.dart';
+import 'package:agentbuddys/screens/monetization/credit_store_screen.dart';
+import 'package:agentbuddys/screens/subscription/subscription_screen.dart';
+
+
+
 
 
 void main() async {
@@ -29,9 +35,11 @@ class AgentBuddysApp extends StatelessWidget {
       title: 'AgentBuddys',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+
         primarySwatch: Colors.deepPurple,
         scaffoldBackgroundColor: Colors.white,
       ),
+      home: const LandingPage(),
       initialRoute: '/',
       routes: {
         '/': (context) => const LandingPage(),
@@ -43,6 +51,10 @@ class AgentBuddysApp extends StatelessWidget {
         '/calendar': (context) => const CalendarViewScreen(),
         '/greetings/templates': (context) => const TemplateSliderPage(),
         '/credit-store': (context) => const CreditStoreScreen(),
+        '/subscription': (context) => const SubscriptionScreen(),
+        '/voice-assistant': (context) => const VoiceAssistantScreen(),
+
+
 
       },
     );

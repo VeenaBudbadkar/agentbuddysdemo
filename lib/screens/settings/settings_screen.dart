@@ -5,6 +5,7 @@ import 'package:agentbuddys/screens/subscription/subscription_screen.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -41,6 +42,15 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.record_voice_over),
+            title: const Text('Voice Assistant'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.pushNamed(context, '/voice-assistant');
+            },
+          ),
+
         ],
       ),
     );

@@ -1,11 +1,12 @@
-// AgentBuddys Dashboard UI - Final Version with Bottom Navigation Integrated
+// AgentBuddys Dashboard UI - Corrected & Fully Functional
 import 'package:flutter/material.dart';
-import 'package:agentbuddys/screens/leads/lead_list_screen.dart';
-import 'package:agentbuddys/screens/clients/client_list_screen.dart';
-import 'package:agentbuddys/screens/greetings/greeting_template_preview_screen.dart';
-import '../greetings/template_slider_page.dart';
-import 'package:your_project_name/screens/settings/settings_screen.dart';
-
+import '../leads/lead_list_screen.dart';
+import '../leads/lead_form_screen.dart';
+import '../clients/client_list_screen.dart';
+import '../greetings/birthday_greeting_screen.dart';
+import '../settings/settings_screen.dart';
+import '../voice_assistant_screen.dart';
+import '../subscription/subscription_screen.dart';
 
 
 void main() {
@@ -43,10 +44,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     const DashboardHome(),
     const LeadListScreen(),
     const ClientListScreen(),
-    const TemplateSliderPage(),
+    const BirthdayGreetingScreen(),
     const SettingsScreen(),
-    const CreditStoreScreen(),
-    Center(child: Text("Settings")),
   ];
 
   @override
@@ -54,35 +53,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       body: _pages[_currentIndex],
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LeadFormScreen()),
+          );
+        },
         backgroundColor: Colors.green,
         child: const Icon(Icons.add, size: 30, color: Colors.white),
       ),
+
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 6.0,
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() => _currentIndex = index);
-          },
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.deepPurple,
-          unselectedItemColor: Colors.grey,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Leads'),
-            BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Clients'),
-            BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'Greetings'),
-            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+            print('Tab Changed: $_currentIndex');
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Leads'),
+          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Clients'),
+          BottomNavigationBarItem(icon: Icon(Icons.card_giftcard), label: 'Greetings'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+        ],
       ),
     );
   }
 }
-
 
 class DashboardHome extends StatelessWidget {
   const DashboardHome({super.key});
@@ -120,244 +123,251 @@ class DashboardHome extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildProfileHeader() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const CircleAvatar(radius: 30, backgroundColor: Colors.grey),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text("Hello Mukesh", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text("Total Clients: 2000"),
-                Text("Rank :"),
-              ],
-            ),
-            const Spacer(),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: const [
-                Text("Total Credits - 100"),
-                Text("Membership - Free", style: TextStyle(fontSize: 12)),
-              ],
-            )
-          ],
-        ),
+
+Widget _buildProfileHeader() {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const CircleAvatar(radius: 30, backgroundColor: Colors.grey),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text("Hello Mukesh", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Total Clients: 2000"),
+              Text("Rank :"),
+            ],
+          ),
+          const Spacer(),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: const [
+              Text("Total Credits - 100"),
+              Text("Membership - Free", style: TextStyle(fontSize: 12)),
+            ],
+          )
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildTodaySection() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+Widget _buildTodaySection() {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: const [
+              _StatusCard(title: "Call", subtitle: "3 Appointment\n5 Follow-up", icon: Icons.phone, color: Colors.lightBlue),
+              _StatusCard(title: "Meet", subtitle: "3 1st Appointment\n5 Follow-up", icon: Icons.video_call, color: Colors.cyan),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 48,
+            child: Row(
               children: const [
-                _StatusCard(title: "Call", subtitle: "3 Appointment\n5 Follow-up", icon: Icons.phone, color: Colors.lightBlue),
-                _StatusCard(title: "Meet", subtitle: "3 1st Appointment\n5 Follow-up", icon: Icons.video_call, color: Colors.cyan),
-              ],
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 48,
-              child: Row(
-                children: const [
-                  Expanded(
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
                     child: _StatusButton(
                       label: "🎁 Birthdays/Anniversaries",
                       color: Colors.orangeAccent,
                       textSize: 12,
                     ),
                   ),
-                  SizedBox(width: 12),
-                  Expanded(
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
                     child: _StatusButton(
                       label: "📅 Add/ View Calendar",
                       color: Colors.yellow,
                       textSize: 12,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildKPISection() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: const [
-            Text("👥 Leads\n20", textAlign: TextAlign.center),
-            Text("📆 1st Appt\n5", textAlign: TextAlign.center),
-            Text("📄 Policies\n3", textAlign: TextAlign.center),
-            Text("💰 Premium\n₹1.5L", textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLeadTypeCard() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("📊 Leads Type", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: const [
-                _StatusButton(label: "🔥 Hot", color: Colors.red),
-                _StatusButton(label: "🌤️ Warm", color: Colors.orange),
-                _StatusButton(label: "❄️ Cold", color: Colors.lightBlue),
+                ),
               ],
             ),
-          ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildKPISection() {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: const [
+          Text("👥 Leads\n20", textAlign: TextAlign.center),
+          Text("📆 1st Appt\n5", textAlign: TextAlign.center),
+          Text("📄 Policies\n3", textAlign: TextAlign.center),
+          Text("💰 Premium\n₹1.5L", textAlign: TextAlign.center),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildLeadTypeCard() {
+  return Card(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    elevation: 4,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("📊 Leads Type", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: const [
+              _StatusButton(label: "🔥 Hot", color: Colors.red),
+              _StatusButton(label: "🌤️ Warm", color: Colors.orange),
+              _StatusButton(label: "❄️ Cold", color: Colors.lightBlue),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildAskBuddySection() {
+  return Card(
+    elevation: 4,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Text("Ask Buddy 🤖", style: TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(height: 10),
+          Image(image: AssetImage('assets/agentbuddys_logo.png'), height: 50),
+          SizedBox(height: 10),
+          Text("Need help with objections? Ask me anything!"),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildTrainingSection() {
+  return ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.pinkAccent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+    ),
+    onPressed: () {},
+    child: const Center(child: Text("📚 Training Sessions", style: TextStyle(color: Colors.white, fontSize: 16))),
+  );
+}
+
+Widget _buildAddClientButton() {
+  return ElevatedButton.icon(
+    onPressed: () {},
+    style: ElevatedButton.styleFrom(
+      backgroundColor: Colors.teal,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+    ),
+    icon: const Icon(Icons.person_add, color: Colors.white),
+    label: const Text("Add Leads+", style: TextStyle(color: Colors.white, fontSize: 16)),
+  );
+}
+
+Widget _buildTopPerformers() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text("🏆 Top Performers", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      const SizedBox(height: 8),
+      const Text("🔥 NOP Rankings", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 6),
+      Column(children: const [
+        _AgentRankCard(
+          emoji: "🥇",
+          name: "Snehalata Bhosale",
+          branch: "91T",
+          company: "LIC",
+          location: "MH/Mumbai",
+          metric: "NOP",
+          value: "12",
         ),
-      ),
-    );
-  }
-
-  Widget _buildAskBuddySection() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Text("Ask Buddy 🤖", style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            Image(image: AssetImage('assets/agentbuddys_logo.png'), height: 50),
-            SizedBox(height: 10),
-            Text("Need help with objections? Ask me anything!"),
-          ],
+        _AgentRankCard(
+          emoji: "🥈",
+          name: "Arjun Mehta",
+          branch: "56B",
+          company: "LIC",
+          location: "MH/Pune",
+          metric: "NOP",
+          value: "10",
         ),
-      ),
-    );
-  }
-
-  Widget _buildTrainingSection() {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.pinkAccent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-      ),
-      onPressed: () {},
-      child: const Center(child: Text("📚 Training Sessions", style: TextStyle(color: Colors.white, fontSize: 16))),
-    );
-  }
-
-  Widget _buildAddClientButton() {
-    return ElevatedButton.icon(
-      onPressed: () {},
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.teal,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      ),
-      icon: const Icon(Icons.person_add, color: Colors.white),
-      label: const Text("Add Leads+", style: TextStyle(color: Colors.white, fontSize: 16)),
-    );
-  }
-
-  Widget _buildTopPerformers() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("🏆 Top Performers", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
-        const Text("🔥 NOP Rankings", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        Column(children: const [
-          _AgentRankCard(
-            emoji: "🥇",
-            name: "Snehalata Bhosale",
-            branch: "91T",
-            company: "LIC",
-            location: "MH/Mumbai",
-            metric: "NOP",
-            value: "12",
-          ),
-          _AgentRankCard(
-            emoji: "🥈",
-            name: "Arjun Mehta",
-            branch: "56B",
-            company: "LIC",
-            location: "MH/Pune",
-            metric: "NOP",
-            value: "10",
-          ),
-          _AgentRankCard(
-            emoji: "🥉",
-            name: "Neha Sharma",
-            branch: "21M",
-            company: "LIC",
-            location: "MH/Nagpur",
-            metric: "NOP",
-            value: "9",
-          ),
-        ]),
-        const SizedBox(height: 12),
-        const Text("💰 Premium Rankings", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        Column(children: const [
-          _AgentRankCard(
-            emoji: "🥇",
-            name: "Amit Singh",
-            branch: "77X",
-            company: "LIC",
-            location: "GJ/Ahmedabad",
-            metric: "Premium",
-            value: "₹1.8L",
-          ),
-          _AgentRankCard(
-            emoji: "🥈",
-            name: "Priya Nair",
-            branch: "11C",
-            company: "LIC",
-            location: "KA/Bangalore",
-            metric: "Premium",
-            value: "₹1.5L",
-          ),
-          _AgentRankCard(
-            emoji: "🥉",
-            name: "Ravi Kumar",
-            branch: "63Y",
-            company: "LIC",
-            location: "TN/Chennai",
-            metric: "Premium",
-            value: "₹1.3L",
-          ),
-        ]),
-      ],
-    );
-  }
+        _AgentRankCard(
+          emoji: "🥉",
+          name: "Neha Sharma",
+          branch: "21M",
+          company: "LIC",
+          location: "MH/Nagpur",
+          metric: "NOP",
+          value: "9",
+        ),
+      ]),
+      const SizedBox(height: 12),
+      const Text("💰 Premium Rankings", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 6),
+      Column(children: const [
+        _AgentRankCard(
+          emoji: "🥇",
+          name: "Amit Singh",
+          branch: "77X",
+          company: "LIC",
+          location: "GJ/Ahmedabad",
+          metric: "Premium",
+          value: "₹1.8L",
+        ),
+        _AgentRankCard(
+          emoji: "🥈",
+          name: "Priya Nair",
+          branch: "11C",
+          company: "LIC",
+          location: "KA/Bangalore",
+          metric: "Premium",
+          value: "₹1.5L",
+        ),
+        _AgentRankCard(
+          emoji: "🥉",
+          name: "Ravi Kumar",
+          branch: "63Y",
+          company: "LIC",
+          location: "TN/Chennai",
+          metric: "Premium",
+          value: "₹1.3L",
+        ),
+      ]),
+    ],
+  );
 }
 
 class _AgentRankCard extends StatelessWidget {
@@ -436,6 +446,32 @@ class _StatusCard extends StatelessWidget {
             Icon(icon, size: 20, color: Colors.white),
             Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 12)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RankCard extends StatelessWidget {
+  final String title;
+  final int rank;
+  final String emoji;
+
+  const _RankCard({required this.title, required this.rank, required this.emoji});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text("$emoji Rank #$rank", style: const TextStyle(fontSize: 14)),
           ],
         ),
       ),

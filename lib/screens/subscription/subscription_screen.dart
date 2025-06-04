@@ -1,11 +1,3 @@
-// This is the starting point for Subscription Logic UI + Backend Setup
-// Step-by-step tasks we'll execute:
-// 1. Create `subscription_plans` table in Supabase (already done)
-// 2. Build UI to show plans (Smart / Power / Elite)
-// 3. Add Razorpay integration for plan payments
-// 4. Store subscription details in a new table `agent_subscriptions`
-// 5. Create logic to activate plan benefits (messages, voice, SEO)
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -41,25 +33,32 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     });
   }
 
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Subscription Activated!')),
     );
+
     final agentId = supabase.auth.currentUser?.id;
-    if (agentId != null) {
-      final selectedPlan = plans.firstWhere((p) => p['plan_name'] == response.orderId);
-      final usageCaps = selectedPlan['usage_caps'] ?? '';
-      final expiryDate = DateTime.now().add(const Duration(days: 30)).toIso8601String();
+    final selectedPlan = plans.firstWhere(
+          (plan) => response.orderId != null && plan['plan_name'] == response.orderId,
+      orElse: () => {},
+    );
+
+    if (agentId != null && selectedPlan.isNotEmpty) {
+      final now = DateTime.now();
+      final expiry = now.add(const Duration(days: 30));
 
       await supabase.from('agent_subscriptions').upsert({
         'agent_id': agentId,
-        'plan_name': response.orderId,
-        'activated_on': DateTime.now().toIso8601String(),
-        'expiry_date': expiryDate,
+        'plan_name': selectedPlan['plan_name'],
+        'start_date': now.toIso8601String(),
+        'end_date': expiry.toIso8601String(),
+        'expiry_date': expiry.toIso8601String(),
         'status': 'active',
-        'usage_caps': usageCaps
+        'price': selectedPlan['price'],
+        'usage_caps': selectedPlan['usage_caps'],
+        'created_at': now.toIso8601String(),
       }, onConflict: 'agent_id');
-
     }
   }
 
@@ -87,6 +86,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       },
     };
     _razorpay.open(options);
+  }
+
+  Future<bool> checkSubscriptionStatus() async {
+    final agentId = supabase.auth.currentUser?.id;
+    if (agentId == null) return false;
+
+    final result = await supabase
+        .from('agent_subscriptions')
+        .select('status, expiry_date')
+        .eq('agent_id', agentId)
+        .maybeSingle();
+
+    if (result == null || result['status'] != 'active') return false;
+
+    final expiryDate = DateTime.tryParse(result['expiry_date']);
+    return expiryDate != null && expiryDate.isAfter(DateTime.now());
   }
 
   @override

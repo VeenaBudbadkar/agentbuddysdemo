@@ -29,21 +29,6 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
     Future.delayed(const Duration(milliseconds: 600), showFestivalOfferDialog);
   }
 
-  Future<void> fetchAgentCredits() async {
-    final agentId = supabase.auth.currentUser?.id;
-    if (agentId == null) return;
-
-    final response = await supabase
-        .from('agent_credits')
-        .select('credits')
-        .eq('agent_id', agentId)
-        .single();
-
-    setState(() {
-      currentCredits = response['credits'] ?? 0;
-    });
-  }
-
   @override
   void dispose() {
     _razorpay.clear();
@@ -56,6 +41,61 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
       creditPacks = List<Map<String, dynamic>>.from(response);
       isLoading = false;
     });
+  }
+
+  Future<void> fetchAgentCredits() async {
+    final agentId = supabase.auth.currentUser?.id;
+    if (agentId == null) return;
+
+    final response = await supabase
+        .from('agent_credits')
+        .select('credits')
+        .eq('agent_id', agentId)
+        .maybeSingle();
+
+    if (response != null && response['credits'] != null) {
+      setState(() {
+        currentCredits = response['credits'] as int;
+      });
+    }
+  }
+
+  Future<void> deductCreditsIfEnough(int amount) async {
+    final agentId = supabase.auth.currentUser?.id;
+    if (agentId == null) return;
+
+    final response = await supabase
+        .from('agent_credits')
+        .select('credits')
+        .eq('agent_id', agentId)
+        .maybeSingle();
+
+    if (response == null || response['credits'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('❌ No credit data found.')),
+      );
+      return;
+    }
+
+    final currentCredits = response['credits'] as int;
+
+    if (currentCredits < amount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('⚠️ Not enough credits!')),
+      );
+      return;
+    }
+
+    final updatedCredits = currentCredits - amount;
+
+    await supabase
+        .from('agent_credits')
+        .update({'credits': updatedCredits})
+        .eq('agent_id', agentId);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ $amount credits deducted. New balance: $updatedCredits')),
+    );
   }
 
   void showFestivalOfferDialog() {
@@ -74,20 +114,111 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
               Text("+ Bonus 20% extra credits 💥", style: TextStyle(color: Colors.green)),
             ],
           ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Maybe Later"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Festival Dhamaka Selected!")),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text("Buy Now – ₹1650"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await deductCreditsIfEnough(99);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text("Use 99 Credits"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void showBulkMessageCreditPopup(BuildContext context, int selectedCount) {
+    if (selectedCount > 5) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Bulk Message Alert"),
+          content: const Text(
+            "You're using bulk messaging like a pro!\n"
+                "Let it go automatically for the next 30 days — use just 99 credits.\n"
+                "No more tapping ‘Send’ again!",
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(ctx),
               child: const Text("Maybe Later"),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
+              onPressed: () async {
+                final agentId = supabase.auth.currentUser?.id;
+                if (agentId == null) return;
+
+                final response = await supabase
+                    .from('agent_credits')
+                    .select('credits')
+                    .eq('agent_id', agentId)
+                    .single();
+
+                final currentCredits = response['credits'] ?? 0;
+
+                if (currentCredits < 99) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("❌ Not enough credits. Please buy more."),
+                    ),
+                  );
+                  return;
+                }
+
+                final updatedCredits = currentCredits - 99;
+
+                await supabase
+                    .from('agent_credits')
+                    .update({'credits': updatedCredits})
+                    .eq('agent_id', agentId);
+
+                await supabase.from('credit_transactions').insert({
+                  'agent_id': agentId,
+                  'credits_used': 99,
+                  'type': 'automation_upgrade',
+                  'used_for': '30-day automation',
+                });
+
+                Navigator.pop(ctx);
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Festival Dhamaka Selected!")),
+                  const SnackBar(
+                    content: Text("✅ Auto Messaging Activated for 30 Days!"),
+                  ),
                 );
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
-              child: const Text("Buy Now - ₹1650"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+              ),
+              child: const Text("Use 99 Credits"),
             ),
           ],
         ),
@@ -103,7 +234,6 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
     final agentId = supabase.auth.currentUser?.id;
     if (agentId == null) return;
 
-    // This should ideally match with package info from Razorpay's custom field
     final selectedPack = creditPacks.firstWhere((pack) => pack['package_name'].toString().toLowerCase().contains("festival"), orElse: () => {});
     if (selectedPack.isNotEmpty) {
       final int creditsToAdd = selectedPack['credits'];
@@ -152,41 +282,6 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
       _razorpay.open(options);
     } catch (e) {
       debugPrint('Error: $e');
-    }
-  }
-
-  void showBulkMessageCreditPopup(int selectedCount) {
-    if (selectedCount > 5) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Bulk Message Alert"),
-          content: const Text("You're using bulk messaging like a pro!\nLet it go automatically for the next 30 days — use just 99 credits. No more tapping ‘Send’ again!"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Maybe Later"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final agentId = supabase.auth.currentUser?.id;
-                if (agentId != null) {
-                  await supabase.from('agent_credits').update({'credits': Field('credits') - 99}).eq('agent_id', agentId);
-                  await supabase.from('credit_transactions').insert({
-                    'agent_id': agentId,
-                    'credits_used': 99,
-                    'type': 'automation_upgrade',
-                    'used_for': '30-day automation'
-                  });
-                }
-                Navigator.pop(ctx);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
-              child: const Text("Go Automatic – 99 Credits"),
-            )
-          ],
-        ),
-      );
     }
   }
 

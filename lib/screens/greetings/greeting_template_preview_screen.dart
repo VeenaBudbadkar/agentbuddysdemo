@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class GreetingTemplatePreviewScreen extends StatefulWidget {
   final Map<String, dynamic> template;
@@ -128,7 +129,7 @@ class _GreetingTemplatePreviewScreenState
         return Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.whatsapp),
+              leading: const Icon(FontAwesomeIcons.whatsapp, color: Colors.green),
               title: const Text('Send via WhatsApp'),
               onTap: () {
                 Navigator.pop(ctx);
