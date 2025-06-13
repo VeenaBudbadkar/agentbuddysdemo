@@ -105,7 +105,10 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
         context: context,
         builder: (context) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text("🎉 Festival Dhamaka Offer!", style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold)),
+          title: const Text(
+            "🎉 Festival Dhamaka Offer!",
+            style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold),
+          ),
           content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -116,13 +119,9 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
           ),
           actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           actions: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Maybe Later"),
-                ),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
@@ -132,19 +131,24 @@ class _CreditStoreScreenState extends State<CreditStoreScreen> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text("Buy Now – ₹1650"),
+                  child: const Text("Buy Now – ₹1650", style: TextStyle(color: Colors.white)),
                 ),
+                const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () async {
                     await deductCreditsIfEnough(99);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text("Use 99 Credits"),
+                  child: const Text("Use 99 Credits", style: TextStyle(color: Colors.white)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Maybe Later"),
                 ),
               ],
             ),

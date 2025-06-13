@@ -40,7 +40,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
     final agentId = supabase.auth.currentUser?.id;
     final selectedPlan = plans.firstWhere(
-          (plan) => response.orderId != null && plan['plan_name'] == response.orderId,
+          (plan) =>
+      response.orderId != null && plan['plan_name'] == response.orderId,
       orElse: () => {},
     );
 
@@ -75,11 +76,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   void startSubscriptionPayment(Map<String, dynamic> plan) {
+    final int amount = (plan['price'] ?? 0) * 100; // ✅ use 0 if null
+    final String planName = plan['plan_name'] ?? 'Unnamed Plan'
+        ?? 'Subscription Plan'; // ✅ safe fallback
+
     var options = {
       'key': 'rzp_test_your_api_key_here',
-      'amount': plan['price'] * 100,
+      'amount': amount,
       'name': 'AgentBuddys',
-      'description': plan['plan_name'],
+      'description': planName,
       'prefill': {
         'contact': '9999999999',
         'email': 'agent@example.com',
@@ -87,6 +92,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     };
     _razorpay.open(options);
   }
+
 
   Future<bool> checkSubscriptionStatus() async {
     final agentId = supabase.auth.currentUser?.id;
@@ -110,6 +116,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     super.dispose();
   }
 
+// ... inside _SubscriptionScreenState class ...
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,36 +132,57 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         itemCount: plans.length,
         itemBuilder: (context, index) {
           final plan = plans[index];
-          final List<String> features = (plan['inclusions'] as String).split('<br>');
+          final String planName = plan['plan_name'] ?? 'Unnamed Plan';
+          final int price = plan['price'] ?? 0;
+          final String inclusions = plan['inclusions'] ?? '';
+          final List<String> features = inclusions.split('<br>');
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             elevation: 4,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    plan['plan_name'],
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
+                  Text(planName, style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text('Price: ₹${plan['price']} / month'),
+                  Text('Price: ₹$price / month'),
                   const SizedBox(height: 8),
-                  ...features.map((f) => Text(f.trim())).toList(),
+                  ...features.map((f) =>
+                      Padding( // Added Padding for better feature text spacing
+                        padding: const EdgeInsets.only(bottom: 4.0),
+                        child: Text('• ${f.trim()}', style: const TextStyle(
+                            fontSize: 14)), // Added bullet point
+                      )).toList(),
                   const SizedBox(height: 12),
                   ElevatedButton(
                     onPressed: () => startSubscriptionPayment(plan),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        foregroundColor: Colors.white,
+                        // For better text visibility
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        // Adjusted padding
+                        textStyle: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                        // Adjusted text style
+                        shape: RoundedRectangleBorder( // Consistent rounded corners
+                          borderRadius: BorderRadius.circular(8),
+                        )
+                    ),
                     child: const Text('Subscribe'),
                   ),
                 ],
               ),
             ),
           );
-        },
-      ),
-    );
-  }
+        }, // Closing curly brace for itemBuilder was missing here in your provided snippet
+      ), // Closing parenthesis for ListView.builder
+    ); // Closing parenthesis for Scaffold
+  } // Closing curly brace for build method
 }

@@ -3,11 +3,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lead_profile_screen.dart'; // ✅ Make sure this path is correct
 
 class LeadListScreen extends StatefulWidget {
-  const LeadListScreen({super.key});
+  final String filterStatus;
+  const LeadListScreen({required this.filterStatus});
 
   @override
   State<LeadListScreen> createState() => _LeadListScreenState();
 }
+
 
 class _LeadListScreenState extends State<LeadListScreen> {
   final supabase = Supabase.instance.client;

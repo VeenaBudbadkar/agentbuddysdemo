@@ -1,7 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../dashboard/main_navigation.dart';
 
-class LandingPage extends StatelessWidget {
+class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
+
+  @override
+  State<LandingPage> createState() => _LandingPageState();
+}
+
+class _LandingPageState extends State<LandingPage> {
+  @override
+  void initState() {
+    super.initState();
+
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      // ✅ Redirect to full app shell if already logged in
+      Future.microtask(() {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainNavigation()),
+        );
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +36,7 @@ class LandingPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/agentbuddys_logo.png', height: 120), // Add your logo to assets folder
+              Image.asset('assets/agentbuddys_logo.png', height: 120),
               const SizedBox(height: 24),
               const Text(
                 "Welcome to AgentBuddys!",

@@ -20,6 +20,11 @@ class LeadProfileScreen extends StatefulWidget {
 }
 
 class _LeadProfileScreenState extends State<LeadProfileScreen> {
+  String? selectedLogType; // 'Call' or 'Meeting'
+  String? selectedInteractionLevel; // '1st Appointment' or 'Follow-up'
+  String? selectedFollowupReason; // Reason inside Follow-up
+  TextEditingController customFollowupReasonController = TextEditingController(); // If custom reason typed
+
   DateTime? followUpDate;
   final supabase = Supabase.instance.client;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -360,43 +365,121 @@ class _LeadProfileScreenState extends State<LeadProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text("🧭 Next Action"),
+                  const Text("🧭 Next Action", style: TextStyle(fontWeight: FontWeight.bold)),
+
                   DropdownButtonFormField<String>(
-                    value: selectedNextAction,
-                    items: nextActionOptions.map((action) => DropdownMenuItem(
-                      value: action,
-                      child: Text(action),
-                    )).toList(),
+                    value: selectedLogType,
+                    hint: const Text("Select Action Type"),
+                    items: ['Call', 'Meeting'].map((type) {
+                      return DropdownMenuItem(value: type, child: Text(type));
+                    }).toList(),
                     onChanged: (value) {
-                      if (value == 'Custom Action') {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text("Enter Custom Action"),
-                            content: TextField(controller: customActionController),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    lead!['next_action'] = customActionController.text;
-                                    selectedNextAction = customActionController.text;
-                                  });
-                                  Navigator.pop(context);
-                                },
-                                child: const Text("Save"),
-                              )
-                            ],
-                          ),
-                        );
-                      } else {
-                        setState(() {
-                          lead!['next_action'] = value;
-                          selectedNextAction = value;
-                        });
-                      }
+                      setState(() {
+                        selectedLogType = value;
+                        selectedInteractionLevel = null;
+                        selectedFollowupReason = null;
+                      });
                     },
                   ),
+
+                  const SizedBox(height: 16),
+
+                  if (selectedLogType != null)
+                    DropdownButtonFormField<String>(
+                      value: selectedInteractionLevel,
+                      hint: const Text("Select Appointment Type"),
+                      items: ['1st Appointment', 'Follow-up'].map((type) {
+                        return DropdownMenuItem(value: type, child: Text(type));
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedInteractionLevel = value;
+                          selectedFollowupReason = null;
+                        });
+                      },
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  if (selectedInteractionLevel == 'Follow-up')
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: selectedFollowupReason,
+                          hint: const Text("Select Follow-up Reason"),
+                          items: [
+                            'Servicing',
+                            'Document Collection',
+                            'Decision Pending',
+                            'Custom Reason'
+                          ].map((reason) {
+                            return DropdownMenuItem(value: reason, child: Text(reason));
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedFollowupReason = value;
+                            });
+                          },
+                        ),
+                        if (selectedFollowupReason == 'Custom Reason')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: TextFormField(
+                              controller: customFollowupReasonController,
+                              decoration: const InputDecoration(labelText: "Enter custom reason"),
+                            ),
+                          ),
+                      ],
+                    ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (selectedLogType == null || selectedInteractionLevel == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Please complete all Next Action fields.")),
+                        );
+                        return;
+                      }
+
+                      final logData = {
+                        'agent_id': Supabase.instance.client.auth.currentUser?.id,
+                        'lead_id': lead!['id'], // Make sure `lead` is defined in your screen
+                        'log_type': selectedLogType,
+                        'interaction_level': selectedInteractionLevel,
+                        'followup_reason': selectedInteractionLevel == 'Follow-up'
+                            ? (selectedFollowupReason == 'Custom Reason'
+                            ? customFollowupReasonController.text
+                            : selectedFollowupReason)
+                            : null,
+                        'created_at': DateTime.now().toIso8601String(),
+                      };
+
+                      final response = await Supabase.instance.client
+                          .from('call_meeting_logs')
+                          .insert(logData);
+
+                      if (response != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Next Action saved successfully!")),
+                        );
+                        setState(() {
+                          selectedLogType = null;
+                          selectedInteractionLevel = null;
+                          selectedFollowupReason = null;
+                          customFollowupReasonController.clear();
+                        });
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Error saving Next Action")),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.save),
+                    label: const Text("Save Action"),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                  ),
+
                   const SizedBox(height: 20),
                   const Text("📅 Follow-up Date"),
                   InkWell(
