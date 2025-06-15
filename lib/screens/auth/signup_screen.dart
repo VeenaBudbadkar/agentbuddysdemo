@@ -22,22 +22,45 @@ class _SignupScreenState extends State<SignupScreen> {
       _error = null;
     });
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() {
+        _error = "Please enter both email and password.";
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
       final res = await supabase.auth.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
-      if (res.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Signup Successful!")),
-        );
-        Navigator.pushReplacementNamed(context, '/login');
+      if (mounted) {
+        if (res.user != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("✅ Signup Successful! Please login.")),
+          );
+          Navigator.pushReplacementNamed(context, '/login');
+        } else {
+          setState(() => _error = "Signup failed. Please try again.");
+        }
       }
     } on AuthException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) {
+        setState(() => _error = e.message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = "Something went wrong. Try again.");
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -52,6 +75,7 @@ class _SignupScreenState extends State<SignupScreen> {
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: "Email"),
+              keyboardType: TextInputType.emailAddress,
             ),
             TextField(
               controller: _passwordController,
@@ -59,11 +83,16 @@ class _SignupScreenState extends State<SignupScreen> {
               decoration: const InputDecoration(labelText: "Password"),
             ),
             const SizedBox(height: 16),
-            if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: Colors.red)),
             ElevatedButton(
               onPressed: _isLoading ? null : _signup,
               child: _isLoading
-                  ? const CircularProgressIndicator()
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
                   : const Text("Sign Up"),
             ),
             TextButton(

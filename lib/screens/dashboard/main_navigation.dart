@@ -3,7 +3,9 @@ import '../leads/lead_list_screen.dart';
 import '../clients/client_list_screen.dart';
 import '../greetings/birthday_greeting_screen.dart';
 import '../settings/settings_screen.dart';
-import 'dashboard_screen.dart'; // ✅ SAME FOLDER
+import 'dashboard_screen.dart';
+import '../settings/agent_profile_settings_screen.dart';
+
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -21,7 +23,9 @@ class _MainNavigationState extends State<MainNavigation> {
     ClientListScreen(),
     BirthdayGreetingScreen(),
     SettingsScreen(),
+    AgentProfileSettingsScreen(),
   ];
+
 
   void _onItemTapped(int index) {
     setState(() {

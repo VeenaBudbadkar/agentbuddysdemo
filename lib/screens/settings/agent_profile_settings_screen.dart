@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:agentbuddys/screens/auth/landing_page.dart';
+import 'package:agentbuddys/screens/auth/change_password_screen.dart';
 
 class AgentProfileSettingsScreen extends StatefulWidget {
   const AgentProfileSettingsScreen({super.key});
 
   @override
-  State<AgentProfileSettingsScreen> createState() => _AgentProfileSettingsScreenState();
+  State<AgentProfileSettingsScreen> createState() =>
+      _AgentProfileSettingsScreenState();
 }
 
-class _AgentProfileSettingsScreenState extends State<AgentProfileSettingsScreen> {
+class _AgentProfileSettingsScreenState
+    extends State<AgentProfileSettingsScreen> {
   final _nameController = TextEditingController();
   bool _isLoading = true;
   String? _error;
@@ -63,28 +67,75 @@ class _AgentProfileSettingsScreenState extends State<AgentProfileSettingsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("My Profile")),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(
+        title: const Text("Agent Profile & Settings"),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Profile picture or icon
+            const CircleAvatar(
+              radius: 40,
+              child: Icon(Icons.person, size: 40),
+            ),
+            const SizedBox(height: 16),
+
+            // Editable Name Field
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Full Name'),
+              decoration: const InputDecoration(labelText: "Your Name"),
             ),
+            const SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: _isLoading ? null : _saveProfile,
+              child: _isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text("Save Profile"),
+            ),
+
+            const SizedBox(height: 40),
+
+            // 👉 Change Password Navigation
+            ListTile(
+              leading: const Icon(Icons.lock_reset),
+              title: const Text("Change Password"),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChangePasswordScreen(),
+                  ),
+                );
+              },
+            ),
+
             const SizedBox(height: 20),
+
+            // 👉 Logout Button
             ElevatedButton.icon(
-              onPressed: _saveProfile,
-              icon: const Icon(Icons.save),
-              label: const Text("Save Changes"),
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              icon: const Icon(Icons.logout),
+              label: const Text("Logout"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
+              onPressed: () async {
+                await Supabase.instance.client.auth.signOut();
+                if (context.mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LandingPage()),
+                        (route) => false,
+                  );
+                }
+              },
+            ),
           ],
         ),
       ),
