@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart'; // ✅ Ensures WidgetsBindingObserver works
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../utils/contact_utils.dart'; // Make sure this exists
+import '../utils/contact_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CallListScreen extends StatefulWidget {
   const CallListScreen({super.key});
@@ -11,23 +13,57 @@ class CallListScreen extends StatefulWidget {
   State<CallListScreen> createState() => _CallListScreenState();
 }
 
-class _CallListScreenState extends State<CallListScreen> {
+class _CallListScreenState extends State<CallListScreen> with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> callLogs = [];
+
+  List<Map<String, dynamic>> appointments = [];
+  List<Map<String, dynamic>> followUps = [];
+
+  List<Map<String, dynamic>> _autoDialList = [];
+  int _currentCallIndex = 0;
+  bool _isAutoDialerActive = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchCallLogs();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isAutoDialerActive && state == AppLifecycleState.resumed) {
+      // Call ended, show feedback
+      _showAutoFeedbackDialog(_autoDialList[_currentCallIndex]);
+    }
+  }
+
   Future<void> _fetchCallLogs() async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
     final response = await supabase
         .from('call_meeting_logs')
         .select('*, lead_master(name, contact_number, email)')
-        .eq('type', 'Call');
+        .eq('type', 'Call')
+        .eq('next_action_date', today);
+
+    List<Map<String, dynamic>> allCalls =
+    List<Map<String, dynamic>>.from(response);
+
     setState(() {
-      callLogs = List<Map<String, dynamic>>.from(response);
+      appointments = allCalls
+          .where((log) => log['sub_type'] == '1st Appointment')
+          .toList();
+      followUps = allCalls
+          .where((log) =>
+      log['sub_type'] != '1st Appointment' && (log['sub_type'] ?? '') != '')
+          .toList();
     });
   }
 
@@ -42,11 +78,47 @@ class _CallListScreenState extends State<CallListScreen> {
     });
   }
 
-  void _showCallDialog({Map<String, dynamic>? log}) {
+  Future<void> _startAutoDialer() async {
+    _autoDialList = [...appointments, ...followUps];
+    _currentCallIndex = 0;
+
+    if (_autoDialList.isNotEmpty) {
+      _isAutoDialerActive = true;
+      _dialNext();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No calls to auto-dial!")),
+      );
+    }
+  }
+
+  Future<void> _dialNext() async {
+    if (_currentCallIndex >= _autoDialList.length) {
+      _isAutoDialerActive = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ All calls completed!")),
+      );
+      return;
+    }
+
+    final currentLog = _autoDialList[_currentCallIndex];
+    final lead = currentLog['lead_master'] ?? {};
+    final contact = lead['contact_number'] ?? '';
+
+    launchCaller(contact);
+    // We rely on `didChangeAppLifecycleState` to handle post-call
+  }
+
+  void _showAutoFeedbackDialog(Map<String, dynamic> log) {
     showDialog(
       context: context,
+      barrierDismissible: false, // Agent must submit feedback!
       builder: (BuildContext context) {
-        String? subAction = log?['sub_type'];
+        String? subAction = log['sub_type'];
+        DateTime selectedDate = DateTime.now();
+        TextEditingController notesController =
+        TextEditingController(text: log['notes'] ?? '');
+
         List<String> subActionOptions = [
           '1st Appointment',
           'Follow-up: Decision',
@@ -56,14 +128,11 @@ class _CallListScreenState extends State<CallListScreen> {
           'Relationship Call',
           'Custom'
         ];
-        DateTime selectedDate = DateTime.now();
-        TextEditingController notesController =
-        TextEditingController(text: log?['notes'] ?? '');
 
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text("Call Feedback"),
+              title: const Text("Call Summary & Next Action"),
               content: SingleChildScrollView(
                 child: Column(
                   children: [
@@ -109,15 +178,11 @@ class _CallListScreenState extends State<CallListScreen> {
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text("Cancel"),
-                ),
                 ElevatedButton(
                   onPressed: () async {
                     await supabase.from('call_meeting_logs').insert({
-                      'agent_id': log?['agent_id'],
-                      'lead_id': log?['lead_id'],
+                      'agent_id': log['agent_id'],
+                      'lead_id': log['lead_id'],
                       'type': 'Call',
                       'sub_type': subAction,
                       'notes': notesController.text,
@@ -125,12 +190,15 @@ class _CallListScreenState extends State<CallListScreen> {
                       'created_at': DateTime.now().toIso8601String(),
                     });
 
-                    await updateKPI(log?['agent_id'], subAction == '1st Appointment' ? 'first_calls' : 'followups');
+                    await updateKPI(log['agent_id'],
+                        subAction == '1st Appointment' ? 'first_calls' : 'followups');
 
                     Navigator.of(context).pop();
-                    _fetchCallLogs();
+
+                    _currentCallIndex++;
+                    _dialNext();
                   },
-                  child: const Text("Save"),
+                  child: const Text("Save & Next"),
                 ),
               ],
             );
@@ -161,18 +229,21 @@ class _CallListScreenState extends State<CallListScreen> {
       onTap: () {},
       child: Card(
         color: _getRowColor(log['sub_type']),
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(leadName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(leadName,
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(log['sub_type'] ?? '', style: const TextStyle(color: Colors.black54)),
+              Text(log['sub_type'] ?? '',
+                  style: const TextStyle(color: Colors.black54)),
               const SizedBox(height: 4),
               GestureDetector(
-                onTap: () => _showCallDialog(log: log),
+                onTap: () => _showAutoFeedbackDialog(log),
                 child: Text("Note: ${log['notes'] ?? ''}",
                     style: const TextStyle(color: Colors.blue)),
               ),
@@ -185,7 +256,8 @@ class _CallListScreenState extends State<CallListScreen> {
                     onPressed: () => launchCaller(contact),
                   ),
                   IconButton(
-                    icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.teal),
+                    icon: const FaIcon(FontAwesomeIcons.whatsapp,
+                        color: Colors.teal),
                     onPressed: () => launchWhatsApp(contact),
                   ),
                   IconButton(
@@ -194,7 +266,7 @@ class _CallListScreenState extends State<CallListScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.check_circle, color: Colors.blue),
-                    onPressed: () => _showCallDialog(log: log),
+                    onPressed: () => _showAutoFeedbackDialog(log),
                   ),
                 ],
               )
@@ -208,10 +280,49 @@ class _CallListScreenState extends State<CallListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Call List")),
-      body: ListView(
-        children: callLogs.map(_buildCallItem).toList(),
+      appBar: AppBar(title: const Text("Today's Calls")),
+      body: appointments.isEmpty && followUps.isEmpty
+          ? const Center(child: Text('No Calls for Today!'))
+          : ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text("Start Auto Dialer"),
+              onPressed: _startAutoDialer,
+            ),
+          ),
+          if (appointments.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                "1st Appointments",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ...appointments.map(_buildCallItem).toList(),
+          if (followUps.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                "Follow-Ups",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ...followUps.map(_buildCallItem).toList(),
+        ],
       ),
     );
+  }
+}
+
+// ✅ Helper launcher function
+void launchCaller(String phoneNumber) async {
+  final url = 'tel:$phoneNumber';
+  if (await canLaunchUrl(Uri.parse(url))) {
+    await launchUrl(Uri.parse(url));
+  } else {
+    throw 'Could not launch $url';
   }
 }

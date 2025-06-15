@@ -28,6 +28,11 @@ import 'package:agentbuddys/screens/training/training_hub_screen.dart';
 import 'dart:async';
 import 'main_navigation.dart';
 import '../../components/premium_services_section.dart';
+import 'package:agentbuddys/screens/campaigns/campaign_list_screen.dart';
+
+
+
+
 
 
 
@@ -65,6 +70,9 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // ✅ Add to your DashboardScreenState:
+
+
   int firstCallCount = 0;
   int followupCallCount = 0;
   int firstMeetCount = 0;
@@ -72,21 +80,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoadingCounts = false;
 
   String selectedPeriod = 'This Month'; // Consider making this interactive
-  String selectedMonthYear = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}"; // Default to current month
+  String selectedMonthYear = "${DateTime
+      .now()
+      .year}-${DateTime
+      .now()
+      .month
+      .toString()
+      .padLeft(2, '0')}"; // Default to current month
 
   // _kpi data will be fetched by FutureBuilder, so no need for a state variable here
   // Map<String, dynamic> _kpi = {'leads': 0, 'appointments': 0, 'policies': 0, 'premium': 0.0};
   Map<String, int> _leadCounts = {'Hot': 0, 'Warm': 0, 'Cold': 0};
 
-  @override
-  void initState() {
-    super.initState();
-    // These fetch data that updates specific parts of the UI not covered by the main FutureBuilder
-    fetchLeadCounts();
-    fetchAppointmentCounts();
-    // loadAgentData(); // This is redundant if fetchAgentProfile in FutureBuilder is used
-    // fetchKPIData(); // This will be called by FutureBuilder
-  }
+
+    @override
+    void initState() {
+      super.initState();
+      // These fetch data that updates specific parts of the UI not covered by the main FutureBuilder
+      fetchLeadCounts();
+      fetchAppointmentCounts();
+      // loadAgentData(); // This is redundant if fetchAgentProfile in FutureBuilder is used
+      // fetchKPIData(); // This will be called by FutureBuilder
+    }
+
 
   Future<void> fetchAppointmentCounts() async {
     if (!mounted) return;
@@ -306,14 +322,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             if (_isLoadingCounts)
-              const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(strokeWidth: 2)))
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
             else
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CallListScreen())),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CallListScreen()),
+                      ),
                       child: _StatusCard(
                         title: "Calls",
                         subtitle: "$firstCallCount 1st\n$followupCallCount Follow-up",
@@ -325,11 +349,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MeetingListScreen())),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MeetingListScreen()),
+                      ),
                       child: _StatusCard(
                         title: "Meetings",
                         subtitle: "$firstMeetCount 1st\n$followupMeetCount Follow-up",
-                        icon: Icons.group_work, // Changed icon for meetings
+                        icon: Icons.group_work,
                         color: Colors.greenAccent.shade700,
                       ),
                     ),
@@ -341,25 +368,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BirthdayGreetingScreen())),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BirthdayGreetingScreen()),
+                    ),
                     icon: const Icon(Icons.cake_outlined),
                     label: const Text("Birthdays Today"),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orangeAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      backgroundColor: Colors.orangeAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarViewScreen())),
-                    icon: const Icon(Icons.calendar_today_outlined),
-                    label: const Text("Open Calendar"),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CampaignListScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.wifi_calling_3_sharp),
+                    label: const Text("Start Campaign"),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow.shade700,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                      backgroundColor: Colors.yellow.shade700,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -491,6 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             const TriggerCarousel(),
             const SizedBox(height: 8),
+
 
 // 👉 Insert Premium Services here (before KPI)
             PremiumServicesSection(),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart'; // For WidgetsBindingObserver
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../utils/contact_utils.dart'; // For launching call, WhatsApp, and email
+import '../utils/contact_utils.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MeetingListScreen extends StatefulWidget {
   const MeetingListScreen({super.key});
@@ -11,23 +13,56 @@ class MeetingListScreen extends StatefulWidget {
   State<MeetingListScreen> createState() => _MeetingListScreenState();
 }
 
-class _MeetingListScreenState extends State<MeetingListScreen> {
+class _MeetingListScreenState extends State<MeetingListScreen> with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> meetingLogs = [];
+
+  List<Map<String, dynamic>> appointments = [];
+  List<Map<String, dynamic>> followUps = [];
+
+  List<Map<String, dynamic>> _autoDialList = [];
+  int _currentMeetingIndex = 0;
+  bool _isAutoDialerActive = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchMeetingLogs();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isAutoDialerActive && state == AppLifecycleState.resumed) {
+      _showAutoFeedbackDialog(_autoDialList[_currentMeetingIndex]);
+    }
+  }
+
   Future<void> _fetchMeetingLogs() async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
     final response = await supabase
         .from('call_meeting_logs')
         .select('*, lead_master(name, contact_number, email)')
-        .eq('type', 'Meeting');
+        .eq('type', 'Meeting')
+        .eq('next_action_date', today);
+
+    List<Map<String, dynamic>> allMeetings =
+    List<Map<String, dynamic>>.from(response);
+
     setState(() {
-      meetingLogs = List<Map<String, dynamic>>.from(response);
+      appointments = allMeetings
+          .where((log) => log['sub_type'] == '1st Appointment')
+          .toList();
+      followUps = allMeetings
+          .where((log) =>
+      log['sub_type'] != '1st Appointment' && (log['sub_type'] ?? '') != '')
+          .toList();
     });
   }
 
@@ -42,28 +77,61 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
     });
   }
 
-  void _showMeetingDialog({Map<String, dynamic>? log}) {
+  Future<void> _startAutoDialer() async {
+    _autoDialList = [...appointments, ...followUps];
+    _currentMeetingIndex = 0;
+
+    if (_autoDialList.isNotEmpty) {
+      _isAutoDialerActive = true;
+      _dialNext();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No meetings to auto-dial!")),
+      );
+    }
+  }
+
+  Future<void> _dialNext() async {
+    if (_currentMeetingIndex >= _autoDialList.length) {
+      _isAutoDialerActive = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ All meetings completed!")),
+      );
+      return;
+    }
+
+    final currentLog = _autoDialList[_currentMeetingIndex];
+    final lead = currentLog['lead_master'] ?? {};
+    final contact = lead['contact_number'] ?? '';
+
+    launchCaller(contact);
+    // Resume observer will handle after call
+  }
+
+  void _showAutoFeedbackDialog(Map<String, dynamic> log) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        String? subAction = log?['sub_type'];
+        String? subAction = log['sub_type'];
+        DateTime selectedDate = DateTime.now();
+        TextEditingController notesController =
+        TextEditingController(text: log['notes'] ?? '');
+
         List<String> subActionOptions = [
-          '2nd Proposal Meeting',
-          'Form & Document Collection',
-          'Medical',
-          'Premium Collection',
-          'Servicing - Other',
+          '1st Appointment',
+          'Follow-up: Decision',
+          'Follow-up: Document',
+          'Follow-up: Premium',
+          'Servicing Meeting',
           'Relationship Meeting',
           'Custom'
         ];
-        DateTime selectedDate = DateTime.now();
-        TextEditingController notesController =
-        TextEditingController(text: log?['notes'] ?? '');
 
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text("Meeting Feedback"),
+              title: const Text("Meeting Summary & Next Action"),
               content: SingleChildScrollView(
                 child: Column(
                   children: [
@@ -109,15 +177,11 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text("Cancel"),
-                ),
                 ElevatedButton(
                   onPressed: () async {
                     await supabase.from('call_meeting_logs').insert({
-                      'agent_id': log?['agent_id'],
-                      'lead_id': log?['lead_id'],
+                      'agent_id': log['agent_id'],
+                      'lead_id': log['lead_id'],
                       'type': 'Meeting',
                       'sub_type': subAction,
                       'notes': notesController.text,
@@ -125,12 +189,15 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
                       'created_at': DateTime.now().toIso8601String(),
                     });
 
-                    await updateKPI(log?['agent_id'], subAction == '2nd Proposal Meeting' ? 'first_meetings' : 'followups');
+                    await updateKPI(log['agent_id'],
+                        subAction == '1st Appointment' ? 'first_meetings' : 'followups');
 
                     Navigator.of(context).pop();
-                    _fetchMeetingLogs();
+
+                    _currentMeetingIndex++;
+                    _dialNext();
                   },
-                  child: const Text("Save"),
+                  child: const Text("Save & Next"),
                 ),
               ],
             );
@@ -142,12 +209,12 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
 
   Color _getRowColor(String? purpose) {
     if (purpose == null) return Colors.white;
-    if (purpose.contains("Document") || purpose.contains("Medical")) {
+    if (purpose.contains("Premium") || purpose.contains("Document")) {
       return Colors.green.shade100;
     } else if (purpose.contains("Servicing")) {
       return Colors.orange.shade100;
     } else {
-      return Colors.yellow.shade100;
+      return Colors.blue.shade100;
     }
   }
 
@@ -157,49 +224,50 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
     final contact = lead['contact_number'] ?? '';
     final email = lead['email'] ?? '';
 
-    return GestureDetector(
-      onTap: () {},
-      child: Card(
-        color: _getRowColor(log['sub_type']),
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(leadName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(log['sub_type'] ?? '', style: const TextStyle(color: Colors.black54)),
-              const SizedBox(height: 4),
-              GestureDetector(
-                onTap: () => _showMeetingDialog(log: log),
-                child: Text("Note: ${log['notes'] ?? ''}",
-                    style: const TextStyle(color: Colors.blue)),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.call, color: Colors.green),
-                    onPressed: () => launchCaller(contact),
-                  ),
-                  IconButton(
-                    icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.teal),
-                    onPressed: () => launchWhatsApp(contact),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.email, color: Colors.deepPurple),
-                    onPressed: () => launchEmail(email),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.check_circle, color: Colors.blue),
-                    onPressed: () => _showMeetingDialog(log: log),
-                  ),
-                ],
-              )
-            ],
-          ),
+    return Card(
+      color: _getRowColor(log['sub_type']),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(leadName,
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(log['sub_type'] ?? '',
+                style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _showAutoFeedbackDialog(log),
+              child: Text("Note: ${log['notes'] ?? ''}",
+                  style: const TextStyle(color: Colors.blue)),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.call, color: Colors.green),
+                  onPressed: () => launchCaller(contact),
+                ),
+                IconButton(
+                  icon: const FaIcon(FontAwesomeIcons.whatsapp,
+                      color: Colors.teal),
+                  onPressed: () => launchWhatsApp(contact),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.email, color: Colors.deepPurple),
+                  onPressed: () => launchEmail(email),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check_circle, color: Colors.blue),
+                  onPressed: () => _showAutoFeedbackDialog(log),
+                ),
+              ],
+            )
+          ],
         ),
       ),
     );
@@ -208,10 +276,49 @@ class _MeetingListScreenState extends State<MeetingListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Meeting List")),
-      body: ListView(
-        children: meetingLogs.map(_buildMeetingItem).toList(),
+      appBar: AppBar(title: const Text("Today's Meetings")),
+      body: appointments.isEmpty && followUps.isEmpty
+          ? const Center(child: Text('No Meetings for Today!'))
+          : ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text("Start Auto Dialer"),
+              onPressed: _startAutoDialer,
+            ),
+          ),
+          if (appointments.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                "1st Appointments",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ...appointments.map(_buildMeetingItem).toList(),
+          if (followUps.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                "Follow-Ups",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ...followUps.map(_buildMeetingItem).toList(),
+        ],
       ),
     );
+  }
+}
+
+// ✅ Universal helper launcher
+void launchCaller(String phoneNumber) async {
+  final url = 'tel:$phoneNumber';
+  if (await canLaunchUrl(Uri.parse(url))) {
+    await launchUrl(Uri.parse(url));
+  } else {
+    throw 'Could not launch $url';
   }
 }
