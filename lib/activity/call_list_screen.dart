@@ -33,8 +33,12 @@ class _CallListScreenState extends State<CallListScreen> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (_isAutoDialerActive) {
+      Navigator.pop(context, true); // ensures update if auto dialer was active
+    }
     super.dispose();
   }
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -98,6 +102,7 @@ class _CallListScreenState extends State<CallListScreen> with WidgetsBindingObse
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("✅ All calls completed!")),
       );
+      Navigator.pop(context, true); // ✅ This returns TRUE to Dashboard!
       return;
     }
 

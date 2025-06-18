@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'greeting_template_preview_screen.dart';
+import 'hybrid_greeting_preview.dart';
+import 'package:agentbuddys/screens/greetings/greeting_template_preview_screen.dart';
 
 class TemplateSliderPage extends StatefulWidget {
-  const TemplateSliderPage({super.key});
+  final List<Map<String, dynamic>> selectedClients;
+  final Map<String, dynamic> agentProfile;
+
+  const TemplateSliderPage({
+    super.key,
+    required this.selectedClients,
+    required this.agentProfile,
+  });
 
   @override
   State<TemplateSliderPage> createState() => _TemplateSliderPageState();
@@ -33,10 +41,10 @@ class _TemplateSliderPageState extends State<TemplateSliderPage> {
           .select()
           .order('created_at', ascending: false);
 
-      final data = response as List;
+      if (response is! List) return;
 
-      for (var template in data) {
-        final category = template['category'] ?? 'other';
+      for (var template in response) {
+        final category = template['category']?.toString().toLowerCase() ?? 'other';
         if (groupedTemplates.containsKey(category)) {
           groupedTemplates[category]!.add(template);
         }
@@ -47,6 +55,9 @@ class _TemplateSliderPageState extends State<TemplateSliderPage> {
       });
     } catch (e) {
       print('Error fetching templates: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -90,45 +101,60 @@ class _TemplateSliderPageState extends State<TemplateSliderPage> {
                       final template = templates[index];
                       return GestureDetector(
                         onTap: () {
+                          if (widget.selectedClients.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please select at least one client!'),
+                              ),
+                            );
+                            return;
+                          }
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => GreetingTemplatePreviewScreen(template: template),
+                              builder: (_) => GreetingTemplatePreviewScreen(
+                                template: template,
+                                clientName: widget.selectedClients[0]['name'],
+                                agentName: widget.agentProfile['name'],
+                              ),
                             ),
                           );
                         },
                         child: Container(
-                          margin: const EdgeInsets.only(right: 12),
-                          width: 140,
+                          width: 250,
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(template['template_thumbnail'] ?? ''),
-                              fit: BoxFit.cover,
-                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.grey.shade200,
                           ),
-                          child: Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(12),
-                                  bottomRight: Radius.circular(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.network(
+                                  template['image_url'] ?? '',
+                                  height: 140,
+                                  width: 250,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        height: 140,
+                                        width: 250,
+                                        color: Colors.grey,
+                                        child: const Icon(Icons.broken_image),
+                                      ),
                                 ),
                               ),
-                              child: Text(
-                                template['title'] ?? '',
+                              const SizedBox(height: 8),
+                              Text(
+                                template['template_name'] ?? 'Unnamed Template',
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ],
                           ),
                         ),
                       );

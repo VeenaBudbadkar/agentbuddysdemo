@@ -1,53 +1,23 @@
-// greetings_automation.dart - Enhanced with Auto-Funnel Based on Client Religion
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:your_app/utils/subscription_guard.dart';
+import 'package:agentbuddys/utils/subscription_guard.dart';
 
 class GreetingsAutomation extends StatefulWidget {
   const GreetingsAutomation({super.key});
-
-  Future<void> sendAutoGreetingWithCredit({
-    required String type, // 'birthday' etc.
-    required String templateId,
-    required int creditCost,
-  }) async {
-    final agentId = Supabase.instance.client.auth.currentUser?.id;
-
-    final today = DateTime.now();
-    final endDate = today.add(const Duration(days: 7));
-    final range = '${today.toIso8601String()},${endDate.toIso8601String()}';
-
-    final response = await Supabase.instance.client
-        .rpc('auto_send_greetings', params: {
-      'p_agent_id': agentId,
-      'p_type': type,
-      'p_date_range': '[${today.toIso8601String()},${endDate.toIso8601String()}]',
-      'p_greeting_template_id': templateId,
-      'p_credit_cost': creditCost,
-    });
-
-    if (response.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Error: ${response.error!.message}')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Greetings sent, credits deducted!')),
-      );
-    }
-  }
 
   @override
   State<GreetingsAutomation> createState() => _GreetingsAutomationState();
 }
 
 class _GreetingsAutomationState extends State<GreetingsAutomation> {
+  final supabase = Supabase.instance.client;
+
   String greetingType = 'Birthday';
   DateTime? startDate;
   DateTime? endDate;
   String? selectedTemplate;
   String? clientReligion;
+  bool autoSendEnabled = true;
 
   final List<String> religionOptions = [
     'All', 'Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Parsi'
@@ -135,11 +105,43 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
     }
   }
 
-  Future<void> autoScheduleGreetingsFunnel() async {
-    final agentId = Supabase.instance.client.auth.currentUser?.id;
+  Future<void> sendAutoGreetingWithCredit({
+    required String type,
+    required String templateId,
+    required int creditCost,
+  }) async {
+    final agentId = supabase.auth.currentUser?.id;
     if (agentId == null) return;
 
-    final response = await Supabase.instance.client.rpc('schedule_auto_greetings_funnel', params: {
+    final today = DateTime.now();
+    final endDate = today.add(const Duration(days: 7));
+    final range = '${today.toIso8601String()},${endDate.toIso8601String()}';
+
+    final response = await supabase
+        .rpc('auto_send_greetings', params: {
+      'p_agent_id': agentId,
+      'p_type': type,
+      'p_date_range': range,
+      'p_greeting_template_id': templateId,
+      'p_credit_cost': creditCost,
+    });
+
+    if (response.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('❌ Error: ${response.error!.message}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Greetings sent, credits deducted!')),
+      );
+    }
+  }
+
+  Future<void> autoScheduleGreetingsFunnel() async {
+    final agentId = supabase.auth.currentUser?.id;
+    if (agentId == null) return;
+
+    final response = await supabase.rpc('schedule_auto_greetings_funnel', params: {
       'p_agent_id': agentId
     });
 
@@ -155,17 +157,20 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
   }
 
   Future<void> triggerGreetingAutomation() async {
-    final agentId = Supabase.instance.client.auth.currentUser?.id;
+    final agentId = supabase.auth.currentUser?.id;
+    if (agentId == null) return;
+
     if (startDate == null || endDate == null || selectedTemplate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("❗ Please fill all fields")),
       );
       return;
     }
+
     final formattedRange =
         "${startDate!.toIso8601String().substring(0, 10)} to ${endDate!.toIso8601String().substring(0, 10)}";
 
-    final response = await Supabase.instance.client.rpc('auto_send_greetings', params: {
+    final response = await supabase.rpc('auto_send_greetings', params: {
       'p_agent_id': agentId,
       'p_type': greetingType.toLowerCase(),
       'p_date_range': formattedRange,
@@ -184,10 +189,8 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
     }
   }
 
-
-  void handleAutoSend(BuildContext context) async {
-    bool isActive = await checkSubscriptionStatus();
-
+  Future<void> handleAutoSend() async {
+    final isActive = await checkSubscriptionStatus();
     if (!isActive) {
       showDialog(
         context: context,
@@ -212,8 +215,7 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
       return;
     }
 
-    // ✅ PROCEED WITH AUTOMATION IF SUBSCRIBED
-    runAutoSendFunction(); // Replace with your real function
+    await triggerGreetingAutomation();
   }
 
   @override
@@ -229,6 +231,7 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
 
+          // Greeting Type Dropdown
           DropdownButtonFormField<String>(
             value: greetingType,
             decoration: const InputDecoration(labelText: "Occasion"),
@@ -244,6 +247,7 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
           ),
           const SizedBox(height: 16),
 
+          // Religion Filter (only for festivals)
           if (greetingType == 'Festival')
             DropdownButtonFormField<String>(
               value: clientReligion,
@@ -254,6 +258,7 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
             ),
           const SizedBox(height: 16),
 
+          // Date Range Selection
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -301,6 +306,7 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
           ),
           const SizedBox(height: 16),
 
+          // Template Selection
           DropdownButtonFormField<String>(
             value: selectedTemplate,
             hint: const Text("Select Template"),
@@ -310,19 +316,24 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
           ),
           const SizedBox(height: 16),
 
+          // Auto-Send Toggle
           SwitchListTile(
             title: const Text("Enable Auto-Send on Occasion Day"),
-            value: true,
-            onChanged: (val) {},
+            value: autoSendEnabled,
+            onChanged: (val) => setState(() => autoSendEnabled = val!),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
 
+          // Action Buttons
           ElevatedButton.icon(
-            onPressed: triggerGreetingAutomation,
+            onPressed: handleAutoSend,
             icon: const Icon(Icons.auto_awesome),
             label: const Text("Send Greetings Now"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
-
+          const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: () {
               sendAutoGreetingWithCredit(
@@ -333,14 +344,19 @@ class _GreetingsAutomationState extends State<GreetingsAutomation> {
             },
             icon: const Icon(Icons.send),
             label: const Text("Send Auto Greetings"),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
-
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: autoScheduleGreetingsFunnel,
             icon: const Icon(Icons.schedule_send),
             label: const Text("Auto Funnel Setup"),
-          )
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
         ],
       ),
     );

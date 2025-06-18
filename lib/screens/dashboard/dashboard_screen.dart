@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:agentbuddys/utils/agent_buddys_alerts.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Assuming these are correct paths and the widgets are defined there
 import 'profile_header.dart';
@@ -26,9 +28,10 @@ import 'trigger_carousel_ui.dart';
 //import 'training_suggestions_ui.dart';
 import 'package:agentbuddys/screens/training/training_hub_screen.dart';
 import 'dart:async';
-import 'main_navigation.dart';
 import '../../components/premium_services_section.dart';
 import 'package:agentbuddys/screens/campaigns/campaign_list_screen.dart';
+import 'package:intl/intl.dart';
+
 
 
 
@@ -71,7 +74,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   // ✅ Add to your DashboardScreenState:
-
+  final supabase = Supabase.instance.client;
 
   int firstCallCount = 0;
   int followupCallCount = 0;
@@ -92,16 +95,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Map<String, dynamic> _kpi = {'leads': 0, 'appointments': 0, 'policies': 0, 'premium': 0.0};
   Map<String, int> _leadCounts = {'Hot': 0, 'Warm': 0, 'Cold': 0};
 
+  bool isMembershipExpired = false;
 
-    @override
-    void initState() {
-      super.initState();
-      // These fetch data that updates specific parts of the UI not covered by the main FutureBuilder
-      fetchLeadCounts();
-      fetchAppointmentCounts();
-      // loadAgentData(); // This is redundant if fetchAgentProfile in FutureBuilder is used
-      // fetchKPIData(); // This will be called by FutureBuilder
-    }
+  @override
+  void initState() {
+    super.initState();
+    // These fetch data that updates specific parts of the UI not covered by the main FutureBuilder
+    fetchLeadCounts();
+    fetchAppointmentCounts();
+    fetchTodayCounts();
+    checkMembershipStatus();
+    // loadAgentData(); // This is redundant if fetchAgentProfile in FutureBuilder is used
+    // fetchKPIData(); // This will be called by FutureBuilder
+  }
 
 
   Future<void> fetchAppointmentCounts() async {
@@ -109,7 +115,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoadingCounts = true);
     try {
       final agentId = Supabase.instance.client.auth.currentUser?.id;
-      if (agentId == null) throw Exception("No Agent ID for appointment counts");
+      if (agentId == null) throw Exception(
+          "No Agent ID for appointment counts");
 
       final today = DateTime.now();
       final startOfDay = DateTime(today.year, today.month, today.day);
@@ -124,10 +131,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       if (!mounted) return;
       setState(() {
-        firstCallCount = response.where((e) => e['log_type'] == 'Call' && e['interaction_level'] == '1st Appointment').length;
-        followupCallCount = response.where((e) => e['log_type'] == 'Call' && e['interaction_level'] == 'Follow-up').length;
-        firstMeetCount = response.where((e) => e['log_type'] == 'Meeting' && e['interaction_level'] == '1st Appointment').length;
-        followupMeetCount = response.where((e) => e['log_type'] == 'Meeting' && e['interaction_level'] == 'Follow-up').length;
+        firstCallCount = response
+            .where((e) =>
+        e['log_type'] == 'Call' && e['interaction_level'] == '1st Appointment')
+            .length;
+        followupCallCount = response
+            .where((e) =>
+        e['log_type'] == 'Call' && e['interaction_level'] == 'Follow-up')
+            .length;
+        firstMeetCount = response
+            .where((e) =>
+        e['log_type'] == 'Meeting' &&
+            e['interaction_level'] == '1st Appointment')
+            .length;
+        followupMeetCount = response
+            .where((e) =>
+        e['log_type'] == 'Meeting' && e['interaction_level'] == 'Follow-up')
+            .length;
         _isLoadingCounts = false;
       });
     } catch (e) {
@@ -146,8 +166,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final data = await Supabase.instance.client
           .from('agent_profile')
-          .select('name, photo_url, credit_balance, membership_plan, monthly_rank')
-          .eq('agent_id', agentId) // Assuming your column is 'agent_id' not 'user_id' as in the top-level func
+          .select(
+          'name, photo_url, credit_balance, membership_plan, monthly_rank')
+          .eq('agent_id',
+          agentId) // Assuming your column is 'agent_id' not 'user_id' as in the top-level func
           .single();
       return data; // Supabase single() throws if not exactly one row, or returns data.
     } catch (e) {
@@ -162,7 +184,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> loadAgentData() async { // This seems redundant given fetchAgentProfile
+  Future<void> loadAgentData() async {
+    // This seems redundant given fetchAgentProfile
     try {
       final agentId = Supabase.instance.client.auth.currentUser?.id;
       if (agentId == null) {
@@ -225,17 +248,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final currentMonthDate = DateTime(int.parse(year), month);
       List<DateTime> quarterMonths = [];
       for (int i = 0; i < 3; i++) {
-        quarterMonths.add(DateTime(currentMonthDate.year, currentMonthDate.month - ((currentMonthDate.month -1) % 3) - i));
+        quarterMonths.add(DateTime(currentMonthDate.year,
+            currentMonthDate.month - ((currentMonthDate.month - 1) % 3) - i));
       }
-      monthsToFetch = quarterMonths.map((d) => "${d.year}-${d.month.toString().padLeft(2, '0')}").toList().reversed.toList();
-
+      monthsToFetch = quarterMonths
+          .map((d) => "${d.year}-${d.month.toString().padLeft(2, '0')}")
+          .toList()
+          .reversed
+          .toList();
     } else if (selectedPeriod == 'Last 6 Months') {
       monthsToFetch = List.generate(6, (i) {
         final d = DateTime(int.parse(year), month - i);
         return '${d.year}-${d.month.toString().padLeft(2, '0')}';
       }).reversed.toList();
     } else if (selectedPeriod == 'Last Year') {
-      monthsToFetch = List.generate(12, (i) => '${int.parse(year) - 1}-${(i + 1).toString().padLeft(2, '0')}');
+      monthsToFetch = List.generate(
+          12, (i) => '${int.parse(year) - 1}-${(i + 1).toString().padLeft(
+          2, '0')}');
     }
 
     if (monthsToFetch.isEmpty) monthsToFetch.add(selectedMonthYear); // Fallback
@@ -247,7 +276,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .eq('agent_id', agentId)
           .in_('month_year', monthsToFetch);
 
-      int leads = 0, appointments = 0, policies = 0;
+      int leads = 0,
+          appointments = 0,
+          policies = 0;
       double premium = 0.0;
 
       for (var row in data) {
@@ -256,7 +287,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         policies += (row['policies_closed'] as num?)?.toInt() ?? 0;
         premium += (row['premium_amount'] as num?)?.toDouble() ?? 0.0;
       }
-      return {'leads': leads, 'appointments': appointments, 'policies': policies, 'premium': premium};
+      return {
+        'leads': leads,
+        'appointments': appointments,
+        'policies': policies,
+        'premium': premium
+      };
     } catch (e) {
       debugPrint("Error fetching KPI data: $e");
       return Future.error("Failed to load KPIs: $e");
@@ -276,12 +312,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           .select('status')
           .eq('agent_id', agentId);
 
-      int hot = 0, warm = 0, cold = 0;
+      int hot = 0,
+          warm = 0,
+          cold = 0;
       for (var row in data) {
         switch (row['status']?.toString()) {
-          case 'Hot': hot++; break;
-          case 'Warm': warm++; break;
-          case 'Cold': cold++; break;
+          case 'Hot':
+            hot++;
+            break;
+          case 'Warm':
+            warm++;
+            break;
+          case 'Cold':
+            cold++;
+            break;
         }
       }
       if (!mounted) return;
@@ -293,10 +337,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> fetchTodayCounts() async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+
+    final callsResponse = await supabase
+        .from('call_meeting_logs')
+        .select('sub_type')
+        .eq('type', 'Call')
+        .eq('next_action_date', today);
+
+    final calls = List<Map<String, dynamic>>.from(callsResponse);
+
+    final meetingsResponse = await supabase
+        .from('call_meeting_logs')
+        .select('sub_type')
+        .eq('type', 'Meeting')
+        .eq('next_action_date', today);
+
+    final meetings = List<Map<String, dynamic>>.from(meetingsResponse);
+
+    setState(() {
+      firstCallCount = calls
+          .where((log) => log['sub_type'] == '1st Appointment')
+          .length;
+      followupCallCount = calls
+          .where((log) =>
+      log['sub_type'] != '1st Appointment' && (log['sub_type'] ?? '') != '')
+          .length;
+
+      firstMeetCount = meetings
+          .where((log) => log['sub_type'] == '1st Appointment')
+          .length;
+      followupMeetCount = meetings
+          .where((log) =>
+      log['sub_type'] != '1st Appointment' && (log['sub_type'] ?? '') != '')
+          .length;
+
+      _isLoadingCounts = false;
+    });
+  }
+
+  Future<void> checkMembershipStatus() async {
+    final response = await Supabase.instance.client
+        .from('agent_profile')
+        .select('membership_expiry_date')
+        .eq('id', Supabase.instance.client.auth.currentUser!.id)
+        .single();
+
+    final expiryDate = DateTime.parse(response['membership_expiry_date']);
+    final now = DateTime.now();
+
+    if (expiryDate.isBefore(now)) {
+      setState(() {
+        isMembershipExpired = true;
+      });
+    }
+  }
+
+
   // _buildProfileHeader is not needed if ProfileHeader widget is used directly
   // Widget _buildProfileHeader() { ... }
 
-  Widget _buildTodoList() { // This is _buildTodaySection, which is already defined.
+  Widget _buildTodoList() {
+    // This is _buildTodaySection, which is already defined.
     return _buildTodaySection();
   }
 
@@ -334,10 +438,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const CallListScreen()),
-                      ),
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (
+                              _) => const CallListScreen()),
+                        );
+                        if (result == true) {
+                          fetchTodayCounts();
+                        }
+                      },
+
                       child: _StatusCard(
                         title: "Calls",
                         subtitle: "$firstCallCount 1st\n$followupCallCount Follow-up",
@@ -349,10 +460,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MeetingListScreen()),
-                      ),
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (
+                              _) => const MeetingListScreen()),
+                        );
+                        if (result == true) {
+                          fetchTodayCounts();
+                        }
+                      },
+
                       child: _StatusCard(
                         title: "Meetings",
                         subtitle: "$firstMeetCount 1st\n$followupMeetCount Follow-up",
@@ -368,10 +486,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BirthdayGreetingScreen()),
-                    ),
+                    onPressed: () =>
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const BirthdayGreetingScreen()),
+                        ),
                     icon: const Icon(Icons.cake_outlined),
                     label: const Text("Birthdays Today"),
                     style: ElevatedButton.styleFrom(
@@ -389,7 +509,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const CampaignListScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const CampaignListScreen()),
                       );
                     },
                     icon: const Icon(Icons.wifi_calling_3_sharp),
@@ -411,19 +532,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildAddLeadButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LeadFormScreen()),
+          );
+        },
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text(
+          "Add Lead",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.teal,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildAddClientButton() {
     return SizedBox( // Give it a specific width or use Expanded in a Row
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const LeadFormScreen())),
+        onPressed: () =>
+            Navigator.push(context, MaterialPageRoute(
+            builder: (context) => const LeadFormScreen())),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.teal,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
         icon: const Icon(Icons.person_add_alt_1_outlined),
-        label: const Text("Add Leads+", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        label: const Text("Add Leads+",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -438,9 +591,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildStatusItem("Hot 🔥", Colors.red.shade400, _leadCounts['Hot'] ?? 0),
-            _buildStatusItem("Warm 🌤️", Colors.orange.shade400, _leadCounts['Warm'] ?? 0),
-            _buildStatusItem("Cold ❄️", Colors.blue.shade300, _leadCounts['Cold'] ?? 0),
+            _buildStatusItem(
+                "Hot 🔥", Colors.red.shade400, _leadCounts['Hot'] ?? 0),
+            _buildStatusItem(
+                "Warm 🌤️", Colors.orange.shade400, _leadCounts['Warm'] ?? 0),
+            _buildStatusItem(
+                "Cold ❄️", Colors.blue.shade300, _leadCounts['Cold'] ?? 0),
           ],
         ),
       ),
@@ -450,7 +606,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildStatusItem(String label, Color color, int count) {
     return Expanded(
       child: GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LeadListScreen(filterStatus: label.split(" ")[0]))), // Use "Hot" not "Hot 🔥"
+        onTap: () =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) =>
+            LeadListScreen(filterStatus: label.split(" ")[0]))),
+        // Use "Hot" not "Hot 🔥"
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -459,11 +618,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               radius: 18,
               child: Text(
                 count.toString(),
-                style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: color, fontSize: 14),
               ),
             ),
             const SizedBox(height: 6),
-            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+            Text(label, textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
           ],
         ),
       ),
@@ -478,14 +639,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: InkWell( // Use InkWell for tap effect
         borderRadius: BorderRadius.circular(16),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const VoiceAssistantScreen())),
+        onTap: () =>
+            Navigator.push(context, MaterialPageRoute(
+            builder: (context) => const VoiceAssistantScreen())),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: ListTile(
-            leading: Icon(Icons.mic_none_outlined, color: Colors.deepPurple, size: 30),
-            title: const Text("Ask Buddy", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepPurple)),
-            subtitle: const Text("Your AI Voice Assistant", style: TextStyle(fontSize: 12)),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18, color: Colors.deepPurple),
+            leading: Icon(
+                Icons.mic_none_outlined, color: Colors.deepPurple, size: 30),
+            title: const Text("Ask Buddy", style: TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.deepPurple)),
+            subtitle: const Text(
+                "Your AI Voice Assistant", style: TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18,
+                color: Colors.deepPurple),
           ),
         ),
       ),
@@ -497,7 +664,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // If TriggerCarousel UI is what this method builds, then you can rename this or use the TriggerCarousel widget directly.
 
   // THIS IS THE PRIMARY METHOD TO BUILD THE DASHBOARD'S BODY CONTENT
-  Widget _buildDashboardScreenContent(Map<String, dynamic> profile, int clientCount, Map<String, dynamic> kpi) {
+  Widget _buildDashboardScreenContent(Map<String, dynamic> profile,
+      int clientCount, Map<String, dynamic> kpi) {
     return RefreshIndicator(
       onRefresh: () async {
         // Re-fetch all necessary data
@@ -515,7 +683,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch, // Make children take full width where appropriate
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          // Make children take full width where appropriate
           children: [
             ProfileHeader(
               agentName: profile['name']?.toString() ?? 'Agent',
@@ -525,38 +694,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
               monthlyRank: (profile['monthly_rank'] as num?)?.toInt() ?? 0,
               membershipPlan: profile['membership_plan']?.toString() ?? 'Free',
             ),
-            _buildTodaySection(), // This was previously _buildTodoList
+            _buildTodaySection(),
+            // This was previously _buildTodoList
             // If TriggerCarousel is an imported widget:
-             // Ensure this is defined or imported
+            // Ensure this is defined or imported
             // Or if you want to use the local _buildInternalTriggerCarouselUi:
 
             const TriggerCarousel(),
             const SizedBox(height: 8),
 
+            _buildAddLeadButton(),
+            const SizedBox(height: 8),
 
 // 👉 Insert Premium Services here (before KPI)
             PremiumServicesSection(),
 
             const SizedBox(height: 8),
-            const KPIDashboardCarousel(), // KPI comes after Premium Services
+            const KPIDashboardCarousel(),
+            // KPI comes after Premium Services
 
             _buildLeadTypeCard(),
             const SizedBox(height: 16),
-            _buildAddClientButton(),
-            const SizedBox(height: 8),
+
             _buildAskBuddySection(),
             const SizedBox(height: 8),
             const SuggestedTrainingCarousel(),
 
             // SuggestedTrainingCarousel(), // This was imported but not used in the layout
-            const TopAgentsRankUi(), // Ensure this is defined or imported
-            const SizedBox(height: 20), // Bottom padding
+            const TopAgentsRankUi(),
+            // Ensure this is defined or imported
+            const SizedBox(height: 20),
+            // Bottom padding
           ],
         ),
       ),
     );
   }
 
+  Widget _buildMembershipBanner() {
+    return Container(
+      width: double.infinity,
+      color: Colors.redAccent,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            "⚠️ Your membership has expired!",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.store, color: Colors.white),
+            label: const Text(
+              "Renew Now",
+              style: TextStyle(
+                  color: Colors.white, decoration: TextDecoration.underline),
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      CreditStoreScreen(
+                        isMembershipExpired: isMembershipExpired,
+                      ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -571,13 +780,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]),
           builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
             if (snapshot.hasError) {
-              debugPrint("❌ FutureBuilder Error: ${snapshot.error}\n${snapshot.stackTrace}");
-              // Provide more user-friendly error messages
+              debugPrint("❌ FutureBuilder Error: ${snapshot.error}\n${snapshot
+                  .stackTrace}");
               String errorMessage = "Error loading dashboard.";
-              if (snapshot.error.toString().contains("No agent profile found")) {
-                errorMessage = "Profile not found. Please complete your registration or contact support.";
-              } else if (snapshot.error.toString().contains("Agent not logged in")){
-                errorMessage = "You are not logged in. Please log in to continue.";
+              if (snapshot.error.toString().contains(
+                  "No agent profile found")) {
+                errorMessage =
+                "Profile not found. Please complete your registration or contact support.";
+              } else
+              if (snapshot.error.toString().contains("Agent not logged in")) {
+                errorMessage =
+                "You are not logged in. Please log in to continue.";
               }
               return Center(
                 child: Padding(
@@ -585,16 +798,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const Icon(
+                          Icons.error_outline, color: Colors.red, size: 48),
                       const SizedBox(height: 16),
                       Text(errorMessage, textAlign: TextAlign.center),
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
                           if (mounted) {
-                            setState(() {
-                              // This will re-trigger the FutureBuilder
-                            });
+                            setState(() {});
                           }
                         },
                         child: const Text("Retry"),
@@ -610,25 +822,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (!snapshot.hasData || snapshot.data == null || snapshot.data!.length < 3) {
+            if (!snapshot.hasData || snapshot.data == null ||
+                snapshot.data!.length < 3) {
               debugPrint("❌ Snapshot has no data or data is incomplete.");
-              return const Center(child: Text("No data available. Please try again later."));
+              return const Center(
+                  child: Text("No data available. Please try again later."));
             }
 
-            final profileData = snapshot.data![0] as Map<String, dynamic>? ?? {};
+            final profileData = snapshot.data![0] as Map<String, dynamic>? ??
+                {};
             final clientCount = snapshot.data![1] as int? ?? 0;
             final kpiData = snapshot.data![2] as Map<String, dynamic>? ?? {};
 
             debugPrint("✅ Dashboard FutureBuilder received data.");
-            // Use the corrected method name for building the dashboard content
-            return _buildDashboardScreenContent(profileData, clientCount, kpiData);
+            return _buildDashboardScreenContent(
+                profileData, clientCount, kpiData);
           },
         ),
       ),
+      // ✅ NO FAB here! Handled by MainNavigation.
     );
   }
 }
-
 // _AgentRankCard - defined but not used in the final layout in _buildDashboardScreenContent
 class _AgentRankCard extends StatelessWidget {
   final String emoji;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'forgot_password_screen.dart';
 
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,14 +23,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final res = await supabase.auth.signInWithPassword(
+      await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
-      if (res.session != null) {
-        // Session auto-handled by AuthGate.
-      }
+      // ✅ No manual Navigator.push — AuthGate will detect and redirect
     } on AuthException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -41,9 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _loginWithGoogle() async {
     try {
-      await supabase.auth.signInWithOAuth(
-        Provider.google,
-      );
+      await supabase.auth.signInWithOAuth(Provider.google);
     } catch (e) {
       debugPrint("Google Sign-In Error: $e");
     }
@@ -107,7 +101,6 @@ class _LoginScreenState extends State<LoginScreen> {
               },
               child: const Text("Forgot Password?"),
             ),
-
           ],
         ),
       ),

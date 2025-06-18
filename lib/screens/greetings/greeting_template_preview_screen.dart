@@ -1,12 +1,26 @@
+import 'dart:typed_data';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart'; // ✅ REQUIRED for RenderRepaintBoundary
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:open_filex/open_filex.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class GreetingTemplatePreviewScreen extends StatefulWidget {
   final Map<String, dynamic> template;
+  final String clientName;
+  final String agentName;
 
-  const GreetingTemplatePreviewScreen({required this.template, super.key});
+  const GreetingTemplatePreviewScreen({
+    super.key,
+    required this.template,
+    required this.clientName,
+    required this.agentName,
+  });
 
   @override
   State<GreetingTemplatePreviewScreen> createState() =>
@@ -15,174 +29,153 @@ class GreetingTemplatePreviewScreen extends StatefulWidget {
 
 class _GreetingTemplatePreviewScreenState
     extends State<GreetingTemplatePreviewScreen> {
-  final supabase = Supabase.instance.client;
+  final GlobalKey _previewKey = GlobalKey(); // ✅ RepaintBoundary key
 
-  List<Map<String, dynamic>> clients = [];
-  Map<String, dynamic>? selectedClient;
-  bool isLoadingClients = true;
+  /// ✅ Share PNG
+  Future<void> _shareAsImage() async {
+    try {
+      RenderRepaintBoundary boundary = _previewKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
 
-  @override
-  void initState() {
-    super.initState();
-    fetchClients();
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData =
+      await image.toByteData(format: ui.ImageByteFormat.png);
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      final dir = await getTemporaryDirectory();
+      final imagePath = '${dir.path}/greeting_card.png';
+      final file = File(imagePath);
+      await file.writeAsBytes(pngBytes);
+
+      await Share.shareXFiles(
+        [XFile(imagePath)],
+        text:
+        "🎉 ${widget.clientName}, best wishes from ${widget.agentName}! 🎉",
+      );
+    } catch (e) {
+      debugPrint('❌ Error sharing image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error sharing greeting image')),
+      );
+    }
   }
 
-  Future<void> fetchClients() async {
-    final response = await supabase
-        .from('client_master')
-        .select('id, full_name, client_salutation, contact_number, email');
+  /// ✅ Download as PDF
+  Future<void> _downloadAsPDF() async {
+    try {
+      RenderRepaintBoundary boundary = _previewKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
 
-    setState(() {
-      clients = List<Map<String, dynamic>>.from(response);
-      isLoadingClients = false;
-    });
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData =
+      await image.toByteData(format: ui.ImageByteFormat.png);
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      final pdf = pw.Document();
+      final pdfImage = pw.MemoryImage(pngBytes);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (_) => pw.Center(child: pw.Image(pdfImage)),
+        ),
+      );
+
+      final dir = await getTemporaryDirectory();
+      final pdfPath = '${dir.path}/greeting_card.pdf';
+      final file = File(pdfPath);
+      await file.writeAsBytes(await pdf.save());
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('✅ PDF saved to: $pdfPath')),
+      );
+
+      await OpenFilex.open(pdfPath);
+    } catch (e) {
+      debugPrint('❌ Error saving PDF: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error saving greeting as PDF')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final template = widget.template;
-    final fullImageUrl = template['template_full_image'] ?? '';
-    final title = template['title'] ?? 'Greeting';
-    final credits = template['credits_required'] ?? 0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Greeting Preview'),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Image.network(
-              fullImageUrl,
-              width: double.infinity,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.broken_image, size: 80),
-            ),
-          ),
-          if (isLoadingClients)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: DropdownButtonFormField<Map<String, dynamic>>(
-                isExpanded: true,
-                value: selectedClient,
-                decoration: const InputDecoration(
-                  labelText: 'Select Client',
-                  border: OutlineInputBorder(),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              RepaintBoundary(
+                key: _previewKey, // ✅ native screenshot key
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Image.network(
+                      template['image_url'] ?? '',
+                      fit: BoxFit.contain,
+                      width: MediaQuery.of(context).size.width * 0.9,
+                    ),
+                    Positioned(
+                      bottom: 80,
+                      child: Text(
+                        widget.clientName,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 4,
+                              color: Colors.black54,
+                              offset: Offset(2, 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 20,
+                      child: Text(
+                        "From ${widget.agentName}",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          color: Colors.white70,
+                          fontStyle: FontStyle.italic,
+                          shadows: [
+                            Shadow(
+                              blurRadius: 2,
+                              color: Colors.black45,
+                              offset: Offset(1, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                items: clients.map((client) {
-                  return DropdownMenuItem(
-                    value: client,
-                    child: Text(client['client_salutation'] ?? client['full_name']),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    selectedClient = value;
-                  });
-                },
               ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.share),
-                  label: const Text("Send Manually (Free)"),
-                  onPressed: selectedClient == null
-                      ? null
-                      : () => _showSendOptions(context, template, selectedClient!),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.flash_on),
-                  label: Text("Send Automatically for $credits Credits"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepOrange,
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Coming Soon: Auto-send")),
-                    );
-                  },
-                ),
-              ],
-            ),
+              const SizedBox(height: 30),
+              ElevatedButton.icon(
+                icon: const FaIcon(FontAwesomeIcons.whatsapp),
+                label: const Text('Send via WhatsApp (PNG)'),
+                onPressed: _shareAsImage,
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('Download as PDF (optional)'),
+                onPressed: _downloadAsPDF,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
-  }
-
-  void _showSendOptions(BuildContext context, Map<String, dynamic> template,
-      Map<String, dynamic> client) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(FontAwesomeIcons.whatsapp, color: Colors.green),
-              title: const Text('Send via WhatsApp'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _sendViaWhatsApp(template, client);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.email),
-              title: const Text('Send via Email'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _sendViaEmail(template, client);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _sendViaWhatsApp(
-      Map<String, dynamic> template, Map<String, dynamic> client) async {
-    final imageUrl = template['template_full_image'];
-    final title = template['title'] ?? 'Greeting';
-    final salutation = client['client_salutation'] ?? client['full_name'];
-
-    final message = Uri.encodeComponent(
-        "🎉 $title 🎉\n\nDear $salutation,\nHere's a greeting specially for you:\n$imageUrl");
-
-    final whatsappUrl = Uri.parse("https://wa.me/?text=$message");
-
-    if (await canLaunchUrl(whatsappUrl)) {
-      await launchUrl(whatsappUrl, mode: LaunchMode.externalApplication);
-    } else {
-      debugPrint("Could not launch WhatsApp");
-    }
-  }
-
-  void _sendViaEmail(
-      Map<String, dynamic> template, Map<String, dynamic> client) async {
-    final subject = Uri.encodeComponent(template['title'] ?? 'Greeting');
-    final imageUrl = template['template_full_image'];
-    final salutation = client['client_salutation'] ?? client['full_name'];
-
-    final body = Uri.encodeComponent(
-        "Dear $salutation,\n\nHere's a greeting just for you:\n\n$imageUrl");
-
-    final emailUrl = Uri.parse("mailto:?subject=$subject&body=$body");
-
-    if (await canLaunchUrl(emailUrl)) {
-      await launchUrl(emailUrl, mode: LaunchMode.externalApplication);
-    } else {
-      debugPrint("Could not launch Email client");
-    }
   }
 }

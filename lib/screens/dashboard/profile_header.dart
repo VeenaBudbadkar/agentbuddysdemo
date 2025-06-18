@@ -6,6 +6,7 @@ import '../subscription/subscription_screen.dart';
 import '../monetization/credit_store_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+
 class ProfileHeader extends StatefulWidget {
   final String agentName;
   final String photoUrl;
@@ -200,20 +201,7 @@ class _ProfileHeaderState extends State<ProfileHeader> with SingleTickerProvider
                                           );
                                         },
                                       ),
-                                      ListTile(
-                                        leading: const Icon(Icons.monetization_on),
-                                        title: const Text("Buy Credits"),
-                                        onTap: () async {
-                                          Navigator.pop(context);
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => const CreditStoreScreen(),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
+                                     ]
                                   ),
                                 ),
                               );
